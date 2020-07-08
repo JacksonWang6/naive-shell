@@ -139,7 +139,7 @@ void deal_special(char* line, char* pos) {
                 CLog(FG_RED, "run here");
                 close(pipefd[1]); /* close write */
                 int fd_out = open(right, O_CREAT | O_RDWR, 0777);
-                char buf[BUF_SIZE << 4] = {0};;
+                char buf[BUF_SIZE << 4] = {0};
                 int cnt = 0;
                 while ((cnt = read(pipefd[0], buf, BUF_SIZE<<4)) > 0) {
                     CLog(FG_GREEN, "%s", buf);
@@ -154,6 +154,51 @@ void deal_special(char* line, char* pos) {
                     free(special_args);
                 }
             }
+            break;
+        case '<':
+            pid = fork();
+            if (pid == 0) {
+                close(pipefd[1]); /* close write */
+                // dup2(pipefd[0], STDIN_FILENO);
+                CLog(FG_RED, "left: %s", left);
+                /* 拼接args */
+                char buf[BUF_SIZE] = {0};
+                char tmp_buf[BUF_SIZE] = {0};
+                sprintf(buf, "%s ", left);
+                int cnt = 0;
+                /* 这里的read貌似阻塞了,不知道怎么破... */
+                while ((cnt = read(pipefd[0], tmp_buf, BUF_SIZE)) > 0) {
+                    Log("buf: %s", buf);
+                    strncat(buf, tmp_buf, cnt);
+                    Log("buf: %s", buf);
+                }
+                buf[strlen(buf) - 1] = '\0';
+                Log("buf: %s", buf);
+                special_exec_cmd(buf);
+            } else {
+                CLog(FG_RED, "run here");
+                close(pipefd[0]); /* close read */
+                int fd_in = open(right, O_RDONLY | O_NONBLOCK, 0777);
+                char buf[BUF_SIZE] = {0};
+                int cnt = 0;
+                /* write to pipefd[1] */
+                while ((cnt = read(fd_in, buf, BUF_SIZE)) > 0) {
+                    write(pipefd[1], buf, cnt);
+                    CLog(FG_RED, "%s: %d", buf, cnt);
+                }
+                wait(NULL);
+                close(fd_in);
+                kill(pid, SIGKILL);
+                if (special_args != NULL) {
+                    Assert(special_args != NULL, "null error");
+                    cmd_table[i].handler(special_args);
+                    free(special_args);
+                }
+            }
+            break;
+        case '|':
+            /* 先todo一下,明天再做 */
+            TODO();
             break;
         default:
             CLog(FG_RED, "run here");
@@ -185,7 +230,6 @@ void special_exec_cmd(char* line) {
                 strncpy(special_args, args, strlen(args));
                 exit(0);
             }
-            /* 该命令不是cd,那么special_args置为NULL,这个全局变量就是为了特殊处理cd加的,唉 */
             cmd_table[i].handler(args);
             exit(0);
         }

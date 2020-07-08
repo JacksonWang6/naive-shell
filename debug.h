@@ -40,3 +40,4 @@
   } while (0)
 
 #define Panic(format, ...) Assert(0, format, ...)
+#define TODO() Assert(0, "Please implement me!")
