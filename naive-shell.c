@@ -5,6 +5,7 @@ int main() {
     signal(SIGINT, int_handler);
 
     char* line = NULL;
+    char *str_end = line + strlen(line);
     while ((line = nsh_readline()) != NULL) {
         pid = -1;
         Log("pid: %d", pid);
@@ -21,6 +22,11 @@ int main() {
         char* cmd = strtok(line, " ");
         /* empty line */
         if (cmd == NULL) continue;
+        /* strtok will set the first delim to '\0', sooo... */
+        char* args = cmd + strlen(cmd) + 1;
+        if (args >= str_end) {
+            args = NULL;
+        }
         /* search cmd and exec it */
         int i;
         for (i = 0; i < CMD_NUM; i++) {
@@ -29,11 +35,18 @@ int main() {
                 if (id == 0) {
                     pid = getpid();
                     Log("fork pid: %d", pid);
-                    cmd_table[i].handler(cmd);
-                    break;
+                    /* special: cd should be exec in parent process */
+                    if (strcmp(cmd_table[i].name, "cd") == 0) return 0;
+                    cmd_table[i].handler(args);
+                    return 0;
                 } else {
                     /* wait son */
+                    pid = id;
                     wait(NULL);
+                    kill(pid, SIGKILL);
+                    if (strcmp(cmd_table[i].name, "cd") == 0) {
+                        cmd_table[i].handler(args);
+                    }
                     break;
                 }
             }
@@ -43,6 +56,7 @@ int main() {
             printf("nsh: command not found: %s\n", cmd);
             printf("please use help to know more.\n");
         }
+        fflush(stdout);
     }
 
     return 0;
@@ -70,13 +84,9 @@ char* nsh_readline() {
 /* ctrl-d 不是发送信号，而是表示一个特殊的二进制值，表示 EOF。 */
 /* ctrl + c signal handler */
 void int_handler(int signum) {
-    Log("sig int");
+    Log("sig int, pid: %d", pid);
     if (pid != -1) {
-        char cmd_buf[100] = {0}; 
-        sprintf(cmd_buf, "kill %d", pid);
-        Log("cmd: %s", cmd_buf);
-        int ret = system(cmd_buf);
-        Assert(ret != -1, "error");
+        kill(pid, SIGKILL);
     }
 }
 
@@ -86,7 +96,7 @@ int cmd_test(char* args) {
     while (1) {
         for (volatile int i = 0; i <= 10000; i++) ;
     }
-    return 0;
+    exit(0);
 }
 
 int cmd_help(char* args) {
@@ -96,7 +106,44 @@ int cmd_help(char* args) {
     return 0;
 }
 
+/* shell build-in cmd */
 int cmd_echo(char* args) {
     CLog(FG_RED, "%s", args);
+    if (args == NULL) printf("\n");
+    else printf("%s\n", args);
+    return 0;
+}
+
+int cmd_exit(char* args) {
+    CLog(FG_RED, "%s", args);
+    int id = getpid();
+    int ppid = getppid();
+    kill(ppid, SIGKILL);
+    kill(id, SIGKILL);
+    exit(0);
+}
+
+/* bug: fork出来的进程更改了目录,但是父进程并没有更改 */
+int cmd_cd(char* args) {
+    CLog(FG_RED, "%s", args);
+    int ret = chdir(args);
+    if (ret == -1) {
+        //error handler
+        printf("cd: no such file or dir: %s\n", args);
+        return -1;
+    }
+    return 0;
+}
+
+int cmd_pwd(char* args) {
+    CLog(FG_RED, "%s", args);
+    char path_buf[128];
+    char* cur;
+    cur = getcwd(path_buf, 128);
+    if (cur == NULL) {
+        printf("there is some error.\n");
+    } else {
+        printf("%s\n", cur);
+    }
     return 0;
 }
