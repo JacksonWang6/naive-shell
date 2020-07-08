@@ -1,6 +1,6 @@
 .PHONY: run clean debug
 
-CFLAGS := -O2 -Wall -Werror 
+CFLAGS := -O2 -Wall 
 SRCS := $(shell find . -name "*.c")
 INCS := $(shell find . -name "*.h") $(SRCS)
 # 这个地方搞了我半天: https://stackoverflow.com/questions/3783149/how-do-i-properly-reference-the-gnu-readline-library-to-scan-terminal-input

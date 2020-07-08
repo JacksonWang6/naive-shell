@@ -20,11 +20,11 @@
 #define ESCAPE "\33[0m"
 #ifdef DEBUG
 #define Log(format, ...) \
-  printf("\33[0m" BG_BLUE "[%s,%d,%s] " format " \33[0m\n", \
-     __FILE__, __LINE__, __func__, ## __VA_ARGS__)
+  printf("\33[0m" BG_BLUE "[%d][%s,%d,%s] " format " \33[0m\n", \
+    getpid(), __FILE__, __LINE__, __func__, ## __VA_ARGS__)
 #define CLog(color, format, ...) \
-  printf("\33[0m" color "[%s,%d,%s] " format " \33[0m\n", \
-     __FILE__, __LINE__, __func__, ## __VA_ARGS__)
+  printf("\33[0m" color "[%d][%s,%d,%s] " format " \33[0m\n", \
+    getpid(), __FILE__, __LINE__, __func__, ## __VA_ARGS__)
 #else
 #define Log(format, ...) ;
 #define CLog(color, format, ...) 

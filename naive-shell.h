@@ -17,7 +17,12 @@
 #include <unistd.h> /* chdir, getcwd */
 /* for use wait */
 #include <sys/wait.h>
+/* for use open */
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "debug.h"
+
+#define BUF_SIZE 512
 
 int cmd_test(char* args);
 int cmd_help(char* args);
@@ -42,7 +47,14 @@ struct {
 
 char* nsh_readline();
 void int_handler(int signum);
+void exec_cmd(char* line);
+char* find_special(char* line);
+void deal_special(char* line, char* pos);
+void special_exec_cmd(char* line);
 
 int pid = -1;
-char special_tokens = {'>', '<', '|'};  /* redirection and pipe */
+char special_tokens[] = {'>', '<', '|'};  /* redirection and pipe */
+#define TOKENS_NUM (sizeof(special_tokens) / sizeof(special_tokens[0]))
 bool exist_special_tokens = false;
+char* str_end;
+char* special_args;
