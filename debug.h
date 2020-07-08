@@ -17,6 +17,7 @@
 #define BG_PURPLE "\033[1;45m"
 #define BG_CYAN   "\033[1;46m"
 #define BG_WHITE  "\033[1;47m"
+#define ESCAPE "\33[0m"
 #ifdef DEBUG
 #define Log(format, ...) \
   printf("\33[0m" BG_BLUE "[%s,%d,%s] " format " \33[0m\n", \
