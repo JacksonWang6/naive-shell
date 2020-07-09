@@ -6,3 +6,7 @@ touch_debug:
 	gcc touch.c -o touch -D DEBUG -Wall
 touch_run:
 	gcc touch.c -o touch -Wall
+mkdir_debug: 
+	gcc mkdir.c -o mkdir -D DEBUG -Wall
+mkdir_run:
+	gcc mkdir.c -o mkdir -Wall
