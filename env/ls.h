@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <time.h>
 
 #include "../debug.h"
 
@@ -32,11 +33,11 @@ char* parse_arguments(int argc, char* argv[]);
 void parse_dir(char* cur_path);
 
 typedef struct file_info {
-    char name[BUF_SIZE];    /* 文件名 */
-    mode_t mode;            /* 权限 */
-    uid_t uid;                /* 所有者 */
-    gid_t gid;                /* 群组 */
-    off_t size;               /* 大小 */
-    struct timespec mtim;   /* 上次修改时间 */
+    char name[BUF_SIZE];        /* 文件名 */
+    char mode[11];              /* 权限 */
+    uid_t uid;                  /* 所有者 */
+    gid_t gid;                  /* 群组 */
+    off_t size;                 /* 大小 */
+    char date[16];              /* 时间 */
     bool l;
 } file_info_t;

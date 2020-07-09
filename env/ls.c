@@ -79,11 +79,16 @@ void parse_dir(char* cur_path) {
     struct stat file_stat;
     file_info_t info;
     while ((ptr = readdir(dir)) != NULL) {
+        if(strcmp(ptr->d_name, ".") == 0 || strcmp(ptr->d_name, "..") == 0)
+            continue;
         strcpy(info.name, ptr->d_name);
+        Log("%s", info.name);
         info.l = false;
+        char result_str[256] = {0};
         if (OP_LIST) {
             info.l = true;
             Log("run here");
+            strcpy(info.mode, "----------");
             int ret = stat(info.name, &file_stat);
             /* error handler */
             if (ret == -1) {
@@ -93,16 +98,39 @@ void parse_dir(char* cur_path) {
             }
             Log("run here");
             /* get detailed info */
-            info.mode = file_stat.st_mode;
+            /* https://blog.csdn.net/wooden954/article/details/2442435 */
+            int b_mask = file_stat.st_mode&S_IFMT;
+            if(b_mask==S_IFDIR) {
+                info.mode[0]='d';
+            }
+            else if(b_mask==S_IFREG){
+                info.mode[0]='-';
+            }
+
+            info.mode[1]=(file_stat.st_mode&S_IRUSR)?'r':'-';
+            info.mode[2]=(file_stat.st_mode&S_IWUSR)?'w':'-';
+            info.mode[3]=(file_stat.st_mode&S_IXUSR)?'x':'-';
+            info.mode[4]=(file_stat.st_mode&S_IRGRP)?'r':'-';
+            info.mode[5]=(file_stat.st_mode&S_IWGRP)?'w':'-';
+            info.mode[6]=(file_stat.st_mode&S_IXGRP)?'x':'-';
+            info.mode[7]=(file_stat.st_mode&S_IROTH)?'r':'-';
+            info.mode[8]=(file_stat.st_mode&S_IWOTH)?'w':'-';
+            info.mode[9]=(file_stat.st_mode&S_IXOTH)?'x':'-';
+
             info.gid = file_stat.st_gid;
             info.uid = file_stat.st_uid;
             Log("run here");
             info.size = file_stat.st_size;
-            info.mtim = file_stat.st_mtim;
+            strftime(info.date,13,"%b %d %H:%M",localtime(&(file_stat.st_mtime)));
             Log("run here");
-            Log("mode: %x, gid: %d, uid: %d, size: %ld, name: %s", info.mode, info.gid, \
+            Log("gid: %d, uid: %d, size: %ld, name: %s", info.gid, \
                                                             info.uid, info.size, info.name);
-            
+            // TODO();
+            sprintf(result_str,"%s %5d %5d %6ld %12s %s\n",info.mode, info.uid, info.gid, info.size, info.date, info.name);
+        } else {
+            sprintf(result_str, "%s\t", info.name);
         }
+
+        printf("%s",result_str);
     }
 }
