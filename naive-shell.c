@@ -368,7 +368,8 @@ bool match_export_cmd(char* cmd, char* args) {
         int i,j;
         char* exec_argv[MAX_ARGV];
         char* arg = strtok(args, " ");
-        j = 0;
+        exec_argv[0] = cmd;
+        j = 1;
         while (arg != NULL) {
             exec_argv[j] = arg;
             arg = strtok(NULL, " ");

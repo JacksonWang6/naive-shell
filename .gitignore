@@ -4,5 +4,4 @@
 !Makefile
 !README.md
 !.gitignore
-!env/*.[ch]
-!env/Makefile
+!env
