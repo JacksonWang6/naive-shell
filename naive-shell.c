@@ -61,12 +61,20 @@ void exec_cmd(char* line) {
     int i;
     for (i = 0; i < CMD_NUM; i++) {
         if (strcmp(cmd, cmd_table[i].name) == 0) {
+            /* judge built-in or not */
+            int ii;
+            for (ii = 0; ii < NR_BUILT_IN_CMD; ii++) {
+                if (strcmp(cmd, built_in_cmd[ii]) == 0) {
+                    cmd_table[i].handler(args);
+                    break;
+                }
+            }
+            if (ii == NR_BUILT_IN_CMD) break;
+            /* 否则在子进程当中执行这一条命令,因为在子进程当中才能杀死 */
             int id = fork();
             if (id == 0) {
                 pid = getpid();
                 Log("fork pid: %d", pid);
-                /* special: cd should be exec in parent process */
-                if (strcmp(cmd_table[i].name, "cd") == 0) exit(0);
                 cmd_table[i].handler(args);
                 exit(0);
             } else {
@@ -74,17 +82,16 @@ void exec_cmd(char* line) {
                 pid = id;
                 wait(NULL);
                 kill(pid, SIGKILL);
-                if (strcmp(cmd_table[i].name, "cd") == 0) {
-                    cmd_table[i].handler(args);
-                }
                 break;
             }
         }
     }
-    /* not found */
+    /* not built-in cmd, try bin */
     if (i == CMD_NUM) {
-        printf("nsh: command not found: %s\n", cmd);
-        printf("please use help to know more.\n");
+        if (match_export_cmd(cmd, args) == false) {
+            printf("nsh: command not found: %s\n", cmd);
+            printf("please use help to know more.\n");
+        }
     }
     fflush(stdout);
     return;
@@ -138,6 +145,7 @@ void deal_special(char* line, char* pos) {
                 CLog(FG_RED, "left: %s, ppid: %d", left, getppid());
                 special_exec_cmd(left);
             } else {
+                pid = id;
                 CLog(FG_RED, "run here");
                 close(pipefd[1]); /* close write */
                 int fd_out = open(right, O_CREAT | O_RDWR, 0777);
@@ -162,23 +170,11 @@ void deal_special(char* line, char* pos) {
             if (id == 0) {
                 pid = getpid();
                 close(pipefd[1]); /* close write */
-                // dup2(pipefd[0], STDIN_FILENO);
+                dup2(pipefd[0], STDIN_FILENO);
                 CLog(FG_RED, "left: %s", left);
-                /* 拼接args */
-                char buf[BUF_SIZE] = {0};
-                char tmp_buf[BUF_SIZE] = {0};
-                sprintf(buf, "%s ", left);
-                int cnt = 0;
-                /* 这里的read貌似阻塞了,不知道怎么破... */
-                while ((cnt = read(pipefd[0], tmp_buf, BUF_SIZE)) > 0) {
-                    Log("buf: %s", buf);
-                    strncat(buf, tmp_buf, cnt);
-                    Log("buf: %s", buf);
-                }
-                buf[strlen(buf) - 1] = '\0';
-                Log("buf: %s", buf);
-                special_exec_cmd(buf);
+                special_exec_cmd(left);
             } else {
+                pid = id;
                 CLog(FG_RED, "run here");
                 close(pipefd[0]); /* close read */
                 int fd_in = open(right, O_RDONLY | O_NONBLOCK, 0777);
@@ -225,6 +221,7 @@ void deal_special(char* line, char* pos) {
                     exec_cmd(left);
                 }
             } else {
+                pid = id;
                 wait(NULL);
                 kill(id, SIGKILL);
             }
@@ -263,10 +260,12 @@ void special_exec_cmd(char* line) {
             exit(0);
         }
     }
-    /* not found */
+    /* not built-in cmd, try bin */
     if (i == CMD_NUM) {
-        printf("nsh: command not found: %s\n", cmd);
-        printf("please use help to know more.\n");
+        if (match_export_cmd(cmd, args) == false) {
+            printf("nsh: command not found: %s\n", cmd);
+            printf("please use help to know more.\n");
+        }
     }
     fflush(stdout);
     return;
@@ -285,7 +284,11 @@ int cmd_test(char* args) {
     CLog(FG_RED, "%s", args);
     /* for test ctrl + c */
     while (1) {
-        for (volatile int i = 0; i <= 10000; i++) ;
+        for (volatile int i = 0; i <= 10000; i++) {
+            char buf[BUF_SIZE];
+            fgets(buf, BUF_SIZE, stdin);
+            puts(buf);
+        }
     }
     exit(0);
 }
@@ -337,4 +340,73 @@ int cmd_pwd(char* args) {
         printf("%s\n", cur);
     }
     return 0;
+}
+
+int cmd_export(char* args) {
+    CLog(FG_RED, "%s", args);
+    /* feature: if there are many paths, it should be Separated by ':' */
+    char* path = strtok(args, ":");
+    while (path != NULL) {
+        path_table[path_cnt] = (char*) malloc (sizeof(char) * strlen(args) * 2);
+        strcpy(path_table[path_cnt], path);
+        Log("path: %s", path);
+        path_cnt++;
+        path = strtok(NULL, ":");
+    }
+    return 0;
+}
+
+/* return value: match ok or fail */
+bool match_export_cmd(char* cmd, char* args) {
+    CLog(FG_RED, "%s", cmd);
+    CLog(FG_RED, "pathcnt: %d", path_cnt);
+    if (path_cnt == 0) return false;
+    char buf[BUF_SIZE] = {0};
+    int id = fork();
+    if (id == -1) Assert(0, "fork error");
+    if (id == 0) {
+        int i,j;
+        char* exec_argv[MAX_ARGV];
+        char* arg = strtok(args, " ");
+        j = 0;
+        while (arg != NULL) {
+            exec_argv[j] = arg;
+            arg = strtok(NULL, " ");
+            j++;
+        }
+        exec_argv[j] = NULL;
+        char* exec_envp[2];
+        for (i = 0; i < path_cnt; i++) {
+            exec_envp[0] = path_table[i];
+            exec_envp[1] = NULL;
+            if (path_table[i][strlen(path_table[i])-1] != '/') {
+                sprintf(buf, "%s/%s", path_table[i], cmd);
+            } else {
+                sprintf(buf, "%s%s", path_table[i], cmd);
+            }
+            if (execve(buf, exec_argv, exec_envp) == -1) continue;
+        }
+        exit(1);
+    }
+    /* 这里不知道怎么获取子进程执行成功还是失败的结果,那么就用一个蠢办法吧 */
+    /* get the filenames of path */
+    DIR* dir;
+    struct dirent* ptr;
+    Log("cmdname: %s, len: %zu", cmd, strlen(cmd));
+    for (int i = 0; i < path_cnt; i++) {
+        if ((dir = opendir(path_table[i])) == NULL) {
+            Assert(0, "open %s error", path_table[i]);
+        }
+        while ((ptr = readdir(dir)) != NULL) {
+            if(strcmp(ptr->d_name,".")==0 || strcmp(ptr->d_name,"..")==0)    ///current dir OR parrent dir
+                continue;
+            else if(ptr->d_type == 8) {
+                /* file */
+                Log("filename: %s, len: %zu", ptr->d_name, strlen(ptr->d_name));
+                if ((strncmp(ptr->d_name, cmd, strlen(cmd)) == 0) && (strlen(ptr->d_name) == strlen(cmd))) return true;
+	        }
+            else continue;
+        }
+    }
+    return false;
 }

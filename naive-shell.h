@@ -20,9 +20,12 @@
 /* for use open */
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include "debug.h"
 
 #define BUF_SIZE 512
+#define NR_PATH 12
+#define MAX_ARGV 12
 
 int cmd_test(char* args);
 int cmd_help(char* args);
@@ -30,6 +33,8 @@ int cmd_echo(char* args);
 int cmd_exit(char* args);
 int cmd_cd(char* args);
 int cmd_pwd(char* args);
+int cmd_export(char* args);
+bool match_export_cmd(char* cmd, char* args);
 
 struct {
     char* name;
@@ -42,6 +47,7 @@ struct {
     {"exit", "cause normal process termination", cmd_exit},
     {"cd", "change directory", cmd_cd},
     {"pwd", "print name of current/working directory", cmd_pwd},
+    {"export", "Set export attribute for nsh variables.", cmd_export},
 };
 #define CMD_NUM (sizeof(cmd_table) / sizeof(cmd_table[0]))
 
@@ -51,6 +57,8 @@ void exec_cmd(char* line);
 char* find_special(char* line);
 void deal_special(char* line, char* pos);
 void special_exec_cmd(char* line);
+char* built_in_cmd[] = {"cd", "export"};/* 在父进程当中执行 */
+#define NR_BUILT_IN_CMD (sizeof(built_in_cmd) / sizeof(built_in_cmd[0]))
 
 int pid = -1;
 char special_tokens[] = {'>', '<', '|'};  /* redirection and pipe */
@@ -58,3 +66,5 @@ char special_tokens[] = {'>', '<', '|'};  /* redirection and pipe */
 bool exist_special_tokens = false;
 char* str_end;
 char* special_args;
+char* path_table[NR_PATH];
+int path_cnt = 0;
