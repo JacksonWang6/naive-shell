@@ -122,18 +122,20 @@ void deal_special(char* line, char* pos) {
     right[k] = 0;
     Log("token: %c", *pos);
     int pipefd[2] = {};
-    pid_t pid;
+    pid_t id;
     if (pipe(pipefd) == -1) {
         Assert(0, "pipe error");
     }
     switch (*pos) {
         case '>':
             /* open file and dup fd */
-            pid = fork();
-            if (pid == 0) {
+            id = fork();
+            if (id == 0) {
+                pid = getpid();
+                Log("ppid: %d", getppid());
                 close(pipefd[0]); /* close read */
                 dup2(pipefd[1], STDOUT_FILENO);
-                CLog(FG_RED, "left: %s", left);
+                CLog(FG_RED, "left: %s, ppid: %d", left, getppid());
                 special_exec_cmd(left);
             } else {
                 CLog(FG_RED, "run here");
@@ -146,18 +148,19 @@ void deal_special(char* line, char* pos) {
                     write(fd_out, buf, cnt);
                 } 
                 wait(NULL);
-                kill(pid, SIGKILL);
+                kill(id, SIGKILL);
                 close(fd_out);
                 if (special_args != NULL) {
                     Assert(special_args != NULL, "null error");
-                    cmd_table[i].handler(special_args);
+                    cmd_table[4].handler(special_args);
                     free(special_args);
                 }
             }
             break;
         case '<':
-            pid = fork();
-            if (pid == 0) {
+            id = fork();
+            if (id == 0) {
+                pid = getpid();
                 close(pipefd[1]); /* close write */
                 // dup2(pipefd[0], STDIN_FILENO);
                 CLog(FG_RED, "left: %s", left);
@@ -188,17 +191,43 @@ void deal_special(char* line, char* pos) {
                 }
                 wait(NULL);
                 close(fd_in);
-                kill(pid, SIGKILL);
+                kill(id, SIGKILL);
                 if (special_args != NULL) {
                     Assert(special_args != NULL, "null error");
-                    cmd_table[i].handler(special_args);
+                    cmd_table[4].handler(special_args);
                     free(special_args);
                 }
             }
             break;
+        /* 目前的这几条内建命令根本测试不了管道... */
         case '|':
             /* 先todo一下,明天再做 */
-            TODO();
+            // TODO();
+            id = fork();
+            if (id == 0) {
+                /* communicate by pipefd2 */
+                int pipefd2[2];
+                if (pipe(pipefd2) == -1) {
+                    Assert(0, "pipe error");
+                }
+                /* fork again, because we should exec cmd twice */
+                int id2 = fork();
+                if (id2 == 0) {
+                    /* son, close write, and read from parent */
+                    close(pipefd2[1]);
+                    dup2(pipefd2[0], STDIN_FILENO);
+                    exec_cmd(right);
+                    exit(0);
+                } else {
+                    /* parent, close read, and write to son */
+                    close(pipefd2[0]);
+                    dup2(pipefd2[1], STDOUT_FILENO);
+                    exec_cmd(left);
+                }
+            } else {
+                wait(NULL);
+                kill(id, SIGKILL);
+            }
             break;
         default:
             CLog(FG_RED, "run here");
