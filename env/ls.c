@@ -89,7 +89,13 @@ void parse_dir(char* cur_path) {
             info.l = true;
             Log("run here");
             strcpy(info.mode, "----------");
-            int ret = stat(info.name, &file_stat);
+            Log("name: %s", info.name);
+            char buf[BUF_SIZE<<2] = {0};
+            sprintf(buf, "%s/%s", cur_path, info.name);
+            Log("buf: %s", buf);
+            /* fix bug: 这里不能直接用文件名啊,因为不一定在当前文件夹下面 */
+            int ret = stat(buf, &file_stat);
+            Log("ret: %d", ret);
             /* error handler */
             if (ret == -1) {
                 success_g = false;
@@ -126,7 +132,8 @@ void parse_dir(char* cur_path) {
             Log("gid: %d, uid: %d, size: %ld, name: %s", info.gid, \
                                                             info.uid, info.size, info.name);
             // TODO();
-            sprintf(result_str,"%s %5d %5d %6ld %12s %s\n",info.mode, info.uid, info.gid, info.size, info.date, info.name);
+            sprintf(result_str,"%s %5d %5d %6ld %12s %s\n",info.mode, info.uid, info.gid, \
+                                                            info.size, info.date, info.name);
         } else {
             sprintf(result_str, "%s\t", info.name);
         }
