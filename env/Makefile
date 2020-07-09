@@ -14,3 +14,11 @@ cp_debug:
 	gcc cp.c -o cp -D DEBUG -Wall
 cp_run:
 	gcc cp.c -o cp -Wall
+rm_debug: 
+	gcc rm.c -o rm -D DEBUG -Wall
+rm_run:
+	gcc rm.c -o rm -Wall
+ln_debug: 
+	gcc ln.c -o ln -D DEBUG -Wall
+ln_run:
+	gcc ln.c -o ln -Wall
