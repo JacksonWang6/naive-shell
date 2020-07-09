@@ -10,3 +10,7 @@ mkdir_debug:
 	gcc mkdir.c -o mkdir -D DEBUG -Wall
 mkdir_run:
 	gcc mkdir.c -o mkdir -Wall
+cp_debug: 
+	gcc cp.c -o cp -D DEBUG -Wall
+cp_run:
+	gcc cp.c -o cp -Wall
