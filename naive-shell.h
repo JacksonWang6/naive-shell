@@ -57,6 +57,7 @@ void exec_cmd(char* line);
 char* find_special(char* line);
 void deal_special(char* line, char* pos);
 void special_exec_cmd(char* line);
+void pipe_exec_cmd(char* line);
 
 char* built_in_cmd[] = {"cd", "export"};/* 在父进程当中执行 */
 #define NR_BUILT_IN_CMD (sizeof(built_in_cmd) / sizeof(built_in_cmd[0]))

@@ -79,7 +79,7 @@ void exec_cmd(char* line) {
                 /* wait son */
                 pid = id;
                 wait(NULL);
-                kill(pid, SIGKILL);
+                kill(id, SIGKILL);
                 break;
             }
         }
@@ -91,7 +91,33 @@ void exec_cmd(char* line) {
             printf("please use help to know more.\n");
         }
     }
-    fflush(stdout);
+    return;
+}
+
+void pipe_exec_cmd(char* line) {
+    char* cmd = strtok(line, " ");
+    /* empty line */
+    if (cmd == NULL) return;
+    /* strtok will set the first delim to '\0', sooo... */
+    char* args = cmd + strlen(cmd) + 1;
+    if (args >= str_end) {
+        args = NULL;
+    }
+    /* search cmd and exec it */
+    int i;
+    for (i = 0; i < CMD_NUM; i++) {
+        if (strcmp(cmd, cmd_table[i].name) == 0) {
+            cmd_table[i].handler(args);
+            break;
+        }
+    }
+    /* not built-in cmd, try bin */
+    if (i == CMD_NUM) {
+        if (match_export_cmd(cmd, args) == false) {
+            printf("nsh: command not found: %s\n", cmd);
+            printf("please use help to know more.\n");
+        }
+    }
     return;
 }
 
@@ -142,6 +168,9 @@ void deal_special(char* line, char* pos) {
                 dup2(pipefd[1], STDOUT_FILENO);
                 CLog(FG_RED, "left: %s, ppid: %d", left, getppid());
                 special_exec_cmd(left);
+                Log("子进程, runhere");
+                close(pipefd[1]);
+                exit(0);
             } else {
                 pid = id;
                 CLog(FG_RED, "run here");
@@ -153,11 +182,12 @@ void deal_special(char* line, char* pos) {
                     CLog(FG_GREEN, "%s", buf);
                     write(fd_out, buf, cnt);
                 } 
+                Log("重定向>: run here");
                 wait(NULL);
                 kill(id, SIGKILL);
+                close(pipefd[0]);
                 close(fd_out);
                 if (special_args != NULL) {
-                    Assert(special_args != NULL, "null error");
                     cmd_table[4].handler(special_args);
                     free(special_args);
                 }
@@ -171,6 +201,8 @@ void deal_special(char* line, char* pos) {
                 dup2(pipefd[0], STDIN_FILENO);
                 CLog(FG_RED, "left: %s", left);
                 special_exec_cmd(left);
+                close(pipefd[0]);
+                exit(0);
             } else {
                 pid = id;
                 CLog(FG_RED, "run here");
@@ -184,10 +216,10 @@ void deal_special(char* line, char* pos) {
                     CLog(FG_RED, "%s: %d", buf, cnt);
                 }
                 wait(NULL);
+                close(pipefd[1]);
                 close(fd_in);
                 kill(id, SIGKILL);
                 if (special_args != NULL) {
-                    Assert(special_args != NULL, "null error");
                     cmd_table[4].handler(special_args);
                     free(special_args);
                 }
@@ -199,6 +231,7 @@ void deal_special(char* line, char* pos) {
             // TODO();
             id = fork();
             if (id == 0) {
+                pid = getpid();
                 /* communicate by pipefd2 */
                 int pipefd2[2];
                 if (pipe(pipefd2) == -1) {
@@ -207,20 +240,34 @@ void deal_special(char* line, char* pos) {
                 /* fork again, because we should exec cmd twice */
                 int id2 = fork();
                 if (id2 == 0) {
-                    /* son, close write, and read from parent */
-                    close(pipefd2[1]);
-                    dup2(pipefd2[0], STDIN_FILENO);
-                    exec_cmd(right);
-                    exit(0);
-                } else {
-                    /* parent, close read, and write to son */
+                    /* son, close read, and write to parent */
                     close(pipefd2[0]);
                     dup2(pipefd2[1], STDOUT_FILENO);
-                    exec_cmd(left);
+                    close(pipefd2[1]);
+                    printf("dup2 dup2\n");
+                    Log("left: %s", left);
+                    pipe_exec_cmd(left);
+                    exit(0);
+                } else {
+                    /* parent, close write, and read from son */
+                    close(pipefd2[1]);
+                    dup2(pipefd2[0], STDIN_FILENO);
+                    printf("wait\n");
+                    close(pipefd2[0]);
+                    /* 测试结果显示,这里没有接受到任何stdin的数据... */
+                    Log("right: %s", right);
+                    int status;
+                    waitpid(id2, &status, 0); /* wait son */
+                    printf("wait\n");
+                    pipe_exec_cmd(right);
+                    printf("wait\n");
+                    kill(id2, SIGKILL);
+                    exit(0);
                 }
+                exit(0);
             } else {
-                pid = id;
                 wait(NULL);
+                pid = id;
                 kill(id, SIGKILL);
             }
             break;
@@ -252,10 +299,10 @@ void special_exec_cmd(char* line) {
                 /* fix bug: *** buffer overflow detected ***: */
                 special_args = (char*) malloc (strlen(args) * sizeof(char) * 2);
                 strncpy(special_args, args, strlen(args));
-                exit(0);
+                return;
             }
             cmd_table[i].handler(args);
-            exit(0);
+            return;
         }
     }
     /* not built-in cmd, try bin */
@@ -265,7 +312,6 @@ void special_exec_cmd(char* line) {
             printf("please use help to know more.\n");
         }
     }
-    fflush(stdout);
     return;
 }
 
@@ -280,12 +326,16 @@ void int_handler(int signum) {
 
 int cmd_test(char* args) {
     CLog(FG_RED, "%s", args);
-    /* for test ctrl + c */
+    /* for test ctrl + c and pipe, redirection */
     while (1) {
         for (volatile int i = 0; i <= 10000; i++) {
-            char buf[BUF_SIZE];
-            fgets(buf, BUF_SIZE, stdin);
-            puts(buf);
+            char buf[BUF_SIZE] = {0};
+            scanf("%s", buf);
+            if (strlen(buf) != 0) {
+                CLog(FG_GREEN, "%s", buf);
+                printf("%s", buf);
+            }
+            // printf("--------------------------\n%s\n---------------------------------\n", buf);
         }
     }
     exit(0);
