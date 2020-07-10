@@ -207,7 +207,7 @@ void deal_special(char* line, char* pos) {
                 pid = id;
                 CLog(FG_RED, "run here");
                 close(pipefd[0]); /* close read */
-                int fd_in = open(right, O_RDONLY | O_NONBLOCK, 0777);
+                int fd_in = open(right, O_RDONLY, 0777);
                 char buf[BUF_SIZE] = {0};
                 int cnt = 0;
                 /* write to pipefd[1] */
@@ -215,8 +215,11 @@ void deal_special(char* line, char* pos) {
                     write(pipefd[1], buf, cnt);
                     CLog(FG_RED, "%s: %d", buf, cnt);
                 }
-                wait(NULL);
                 close(pipefd[1]);
+                // printf("parent, after while, wait for %d\n", id);
+                int status;
+                waitpid(id, &status, 0);
+                // printf("parent, after wait\n");
                 close(fd_in);
                 kill(id, SIGKILL);
                 if (special_args != NULL) {
@@ -252,15 +255,12 @@ void deal_special(char* line, char* pos) {
                     /* parent, close write, and read from son */
                     close(pipefd2[1]);
                     dup2(pipefd2[0], STDIN_FILENO);
-                    printf("wait\n");
+                    dup2(pipefd2[0], STDERR_FILENO);
                     close(pipefd2[0]);
                     /* 测试结果显示,这里没有接受到任何stdin的数据... */
+                    /* update: solved */
                     Log("right: %s", right);
-                    int status;
-                    waitpid(id2, &status, 0); /* wait son */
-                    printf("wait\n");
                     pipe_exec_cmd(right);
-                    printf("wait\n");
                     kill(id2, SIGKILL);
                     exit(0);
                 }
@@ -326,7 +326,7 @@ void int_handler(int signum) {
 
 int cmd_test(char* args) {
     CLog(FG_RED, "%s", args);
-    /* for test ctrl + c and pipe, redirection */
+    /* just for test ctrl + c */
     while (1) {
         for (volatile int i = 0; i <= 10000; i++) {
             char buf[BUF_SIZE] = {0};
@@ -433,11 +433,23 @@ bool match_export_cmd(char* cmd, char* args) {
             } else {
                 sprintf(buf, "%s%s", path_table[i], cmd);
             }
+            Log("runhere");
             if (execve(buf, exec_argv, exec_envp) == -1) continue;
+            printf("should not run here\n");
         }
-        exit(1);
+    } else {
+        Log("run here");
+        int status;
+        waitpid(id, &status, 0);
+        // printf("run here\n");
+        kill(id, SIGKILL);
     }
     /* 这里不知道怎么获取子进程执行成功还是失败的结果,那么就用一个蠢办法吧 */
+    /*  update:我现在知道了一种方法		
+        int status;
+		waitpid(pid, &status, 0);
+		int exitCode = WEXITSTATUS(status); 
+        */
     /* get the filenames of path */
     DIR* dir;
     struct dirent* ptr;

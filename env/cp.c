@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
         /* exist or not? */
         int r1 = access(source, F_OK);
         if (r1 == -1) {
-            printf("cp: Unable to get the file status (stat) of %s : there is no file or directory", source);
+            printf("cp: Unable to get the file status (stat) of %s : there is no file or directory\n", source);
             return -1;
         }
         int r2 = access(target, F_OK);
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
         char* target = argv[argc-1];
         int ret = access(target, F_OK);
         if (ret == -1) {
-            printf("cp: target %s is not a directory", target);
+            printf("cp: target %s is not a directory\n", target);
             return -1;
         }
 
@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (target_t != CP_DIR) {
-            printf("cp: target %s is not a directory", target);
+            printf("cp: target %s is not a directory\n", target);
             return -1;
         }
 
