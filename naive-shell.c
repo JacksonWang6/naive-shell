@@ -62,12 +62,14 @@ void exec_cmd(char* line) {
     for (i = 0; i < CMD_NUM; i++) {
         if (strcmp(cmd, cmd_table[i].name) == 0) {
             /* judge built-in or not */
-            for (int ii = 0; ii < NR_BUILT_IN_CMD; ii++) {
+            int ii;
+            for (ii = 0; ii < NR_BUILT_IN_CMD; ii++) {
                 if (strcmp(cmd, built_in_cmd[ii]) == 0) {
                     cmd_table[i].handler(args);
                     break;
                 }
             }
+            if (ii < NR_BUILT_IN_CMD) break;
             /* 否则在子进程当中执行这一条命令,因为在子进程当中才能杀死 */
             int id = fork();
             if (id == 0) {
@@ -247,7 +249,7 @@ void deal_special(char* line, char* pos) {
                     close(pipefd2[0]);
                     dup2(pipefd2[1], STDOUT_FILENO);
                     close(pipefd2[1]);
-                    printf("dup2 dup2\n");
+                    // printf("dup2 dup2\n");
                     Log("left: %s", left);
                     pipe_exec_cmd(left);
                     exit(0);
